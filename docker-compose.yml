@@ -1,0 +1,76 @@
+# Define variables into ./.env file
+
+version: '2'
+
+services:
+  mysql:
+    image: mysql:5.6
+    ports:
+      - $MYSQL_PORT:3306
+    volumes:
+      - $MYSQL_PATH_DATA:/var/lib/mysql/
+      - ./dist/docker/mysql/conf.d:/etc/mysql/conf.d
+      - ./:/var/www/html/
+    environment:
+      - MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
+      - MYSQL_DATABASE=$MYSQL_DATABASE
+      - MYSQL_USER=$MYSQL_USER
+      - MYSQL_PASSWORD=$MYSQL_PASSWORD
+    networks:
+      - cuc
+
+  redis_session:
+    image: redis
+    networks:
+      - cuc
+
+  redis_cache:
+    image: redis
+    networks:
+      - cuc
+
+  web:
+    build:
+      context: ./dist/docker_php7
+      dockerfile: Dockerfile
+    ports:
+      - 2080:80
+    volumes:
+      - ./:/app/
+    links:
+      - mysql:mysql
+      - redis_session:redis_session
+      - redis_cache:redis_cache
+    depends_on:
+      - mysql
+      - redis_session
+      - redis_cache
+    networks:
+      - cuc
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    ports:
+      - 8680:80
+    depends_on:
+      - mysql
+    environment:
+      PMA_HOST: mysql
+    networks:
+      - cuc
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.0
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - cuc
+
+networks:
+  cuc:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${NETWORK_SUBNET}.0.0/16
+          gateway: ${NETWORK_SUBNET}.0.1
